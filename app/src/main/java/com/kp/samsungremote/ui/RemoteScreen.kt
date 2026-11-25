@@ -49,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -82,21 +84,17 @@ fun RemoteScreen(vm: RemoteViewModel, modifier: Modifier = Modifier) {
                     contentColor = Color.White,
                 )
             }
-            Captioned("Settings") { IconKey(Icons.Filled.Settings, "Settings", { vm.key(TvKey.MENU) }) }
-            Captioned("Source") { IconKey(Icons.AutoMirrored.Filled.Input, "Source", { vm.key(TvKey.SOURCE) }) }
-        }
-
-        DirectionPad(vm)
-
-        KeyRow {
-            Captioned("Return") {
+            Captioned("Settings") {
                 IconKey(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    "Return",
-                    onClick = { vm.key(TvKey.RETURN) },
-                    onHoldStart = { vm.keyDown(TvKey.RETURN) },
-                    onHoldEnd = { vm.keyUp(TvKey.RETURN) },
-                )
+                    Icons.Filled.Settings,
+                    "Settings",
+                    { vm.key(TvKey.MENU) })
+            }
+            Captioned("Source") {
+                IconKey(
+                    Icons.AutoMirrored.Filled.Input,
+                    "Source",
+                    { vm.key(TvKey.SOURCE) })
             }
             Captioned("Home") {
                 IconKey(
@@ -107,10 +105,12 @@ fun RemoteScreen(vm: RemoteViewModel, modifier: Modifier = Modifier) {
                     onHoldEnd = { vm.keyUp(TvKey.HOME) },
                 )
             }
-            Captioned("Exit") { IconKey(Icons.Filled.Close, "Exit", { vm.key(TvKey.EXIT) }) }
         }
 
+
+
         KeyRow {
+            DirectionPad(vm)
             Rocker(
                 title = "VOL",
                 up = { vm.key(TvKey.VOL_UP) },
@@ -121,19 +121,23 @@ fun RemoteScreen(vm: RemoteViewModel, modifier: Modifier = Modifier) {
                 middleLabel = "Mute",
                 middle = { vm.key(TvKey.MUTE) },
             )
-            Rocker(
-                title = "CH",
-                up = { vm.key(TvKey.CH_UP) },
-                down = { vm.key(TvKey.CH_DOWN) },
-                upIcon = Icons.Filled.KeyboardArrowUp,
-                downIcon = Icons.Filled.KeyboardArrowDown,
-                middleIcon = Icons.AutoMirrored.Filled.List,
-                middleLabel = "Channel list",
-                middle = { vm.key(TvKey.CH_LIST) },
-            )
+        }
+        MediaBar(vm, playing)
+        KeyRow {
+            Captioned("Return") {
+                IconKey(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    "Return",
+                    onClick = { vm.key(TvKey.RETURN) },
+                    onHoldStart = { vm.keyDown(TvKey.RETURN) },
+                    onHoldEnd = { vm.keyUp(TvKey.RETURN) },
+                )
+            }
+
+            Captioned("Exit") { IconKey(Icons.Filled.Close, "Exit", { vm.key(TvKey.EXIT) }) }
         }
 
-        MediaBar(vm, playing)
+
     }
 }
 
@@ -152,7 +156,12 @@ private fun Captioned(caption: String, key: @Composable () -> Unit) = Column(
     verticalArrangement = Arrangement.spacedBy(6.dp),
 ) {
     key()
-    Text(caption, fontSize = 11.sp, letterSpacing = 0.4.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
+    Text(
+        caption,
+        fontSize = 11.sp,
+        letterSpacing = 0.4.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+    )
 }
 
 @Composable
@@ -160,13 +169,49 @@ private fun DirectionPad(vm: RemoteViewModel) {
     val arrowColor = MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = Modifier
-            .size(252.dp)
+            .size(200.dp)
             .raised(MaterialTheme.colorScheme.surfaceContainer, CircleShape, elevation = 10.dp),
     ) {
-        Arrow(Icons.Filled.KeyboardArrowUp, "Up", TvKey.UP, vm, Modifier.align(Alignment.TopCenter).padding(top = 6.dp), arrowColor)
-        Arrow(Icons.Filled.KeyboardArrowDown, "Down", TvKey.DOWN, vm, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), arrowColor)
-        Arrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Left", TvKey.LEFT, vm, Modifier.align(Alignment.CenterStart).padding(start = 6.dp), arrowColor)
-        Arrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Right", TvKey.RIGHT, vm, Modifier.align(Alignment.CenterEnd).padding(end = 6.dp), arrowColor)
+        Arrow(
+            Icons.Filled.KeyboardArrowUp,
+            "Up",
+            TvKey.UP,
+            vm,
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 2.dp),
+            arrowColor
+        )
+        Arrow(
+            Icons.Filled.KeyboardArrowDown,
+            "Down",
+            TvKey.DOWN,
+            vm,
+            Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 2.dp),
+            arrowColor
+        )
+        Arrow(
+            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+            "Left",
+            TvKey.LEFT,
+            vm,
+            Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 2.dp),
+            arrowColor
+        )
+        Arrow(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            "Right",
+            TvKey.RIGHT,
+            vm,
+            Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 2.dp),
+            arrowColor
+        )
         RemoteButton(
             onClick = { vm.key(TvKey.ENTER) },
             label = "OK",
@@ -174,7 +219,9 @@ private fun DirectionPad(vm: RemoteViewModel) {
             onHoldEnd = { vm.keyUp(TvKey.ENTER) },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.align(Alignment.Center).size(100.dp),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(70.dp),
         ) {
             Text("OK", fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 1.sp)
         }
@@ -182,7 +229,14 @@ private fun DirectionPad(vm: RemoteViewModel) {
 }
 
 @Composable
-private fun Arrow(icon: ImageVector, label: String, code: String, vm: RemoteViewModel, modifier: Modifier, color: Color) = IconKey(
+private fun Arrow(
+    icon: ImageVector,
+    label: String,
+    code: String,
+    vm: RemoteViewModel,
+    modifier: Modifier,
+    color: Color
+) = IconKey(
     icon,
     label,
     { vm.key(code) },
@@ -214,16 +268,42 @@ private fun Rocker(
             .raised(MaterialTheme.colorScheme.surfaceVariant, shape, elevation = 8.dp)
             .padding(vertical = 4.dp),
     ) {
-        RemoteButton(onClick = up, label = "$title up", repeat = true, flat = true, shape = shape, containerColor = Color.Transparent, modifier = Modifier.width(96.dp).height(76.dp)) {
+        RemoteButton(
+            onClick = up,
+            label = "$title up",
+            repeat = true,
+            flat = true,
+            shape = shape,
+            containerColor = Color.Transparent,
+            modifier = Modifier
+                .width(96.dp)
+                .height(76.dp)
+        ) {
             Icon(upIcon, contentDescription = null, modifier = Modifier.size(32.dp))
         }
-        RemoteButton(onClick = middle, label = middleLabel, flat = true, containerColor = Color.Black.copy(alpha = 0.18f), modifier = Modifier.size(58.dp)) {
+        RemoteButton(
+            onClick = middle,
+            label = middleLabel,
+            flat = true,
+            containerColor = Color.Black.copy(alpha = 0.18f),
+            modifier = Modifier.size(58.dp)
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 Icon(middleIcon, contentDescription = null, modifier = Modifier.size(18.dp))
             }
         }
-        RemoteButton(onClick = down, label = "$title down", repeat = true, flat = true, shape = shape, containerColor = Color.Transparent, modifier = Modifier.width(96.dp).height(76.dp)) {
+        RemoteButton(
+            onClick = down,
+            label = "$title down",
+            repeat = true,
+            flat = true,
+            shape = shape,
+            containerColor = Color.Transparent,
+            modifier = Modifier
+                .width(96.dp)
+                .height(76.dp)
+        ) {
             Icon(downIcon, contentDescription = null, modifier = Modifier.size(32.dp))
         }
     }
@@ -240,7 +320,15 @@ private fun MediaBar(vm: RemoteViewModel, playing: Boolean) {
             .raised(MaterialTheme.colorScheme.surfaceContainer, shape, elevation = 8.dp)
             .padding(8.dp),
     ) {
-        IconKey(Icons.Filled.FastRewind, "Rewind", { vm.key(TvKey.REWIND) }, size = 56.dp, iconSize = 28.dp, flat = true, containerColor = Color.Transparent)
+        IconKey(
+            Icons.Filled.FastRewind,
+            "Rewind",
+            { vm.key(TvKey.REWIND) },
+            size = 56.dp,
+            iconSize = 28.dp,
+            flat = true,
+            containerColor = Color.Transparent
+        )
         RemoteButton(
             onClick = vm::playPause,
             label = if (playing) "Pause" else "Play",
@@ -250,12 +338,28 @@ private fun MediaBar(vm: RemoteViewModel, playing: Boolean) {
         ) {
             AnimatedContent(
                 targetState = playing,
-                transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.6f)) },
+                transitionSpec = {
+                    (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith (fadeOut() + scaleOut(
+                        targetScale = 0.6f
+                    ))
+                },
                 label = "playPause",
             ) { isPlaying ->
-                Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(34.dp))
+                Icon(
+                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(34.dp)
+                )
             }
         }
-        IconKey(Icons.Filled.FastForward, "Fast forward", { vm.key(TvKey.FAST_FORWARD) }, size = 56.dp, iconSize = 28.dp, flat = true, containerColor = Color.Transparent)
+        IconKey(
+            Icons.Filled.FastForward,
+            "Fast forward",
+            { vm.key(TvKey.FAST_FORWARD) },
+            size = 56.dp,
+            iconSize = 28.dp,
+            flat = true,
+            containerColor = Color.Transparent
+        )
     }
 }
