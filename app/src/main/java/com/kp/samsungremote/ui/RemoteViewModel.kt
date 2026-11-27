@@ -7,6 +7,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.kp.samsungremote.data.KeySequence
 import com.kp.samsungremote.data.Prefs
 import com.kp.samsungremote.tv.ConnectionState
 import com.kp.samsungremote.tv.NetworkScan
@@ -17,6 +18,7 @@ import com.kp.samsungremote.tv.TvInfo
 import com.kp.samsungremote.tv.TvKey
 import com.kp.samsungremote.tv.WakeOnLan
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -27,9 +29,11 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.Inet4Address
 
 data class DiscoveredTv(val host: String, val name: String, val model: String)
@@ -48,6 +52,9 @@ data class SetupUi(
     val discovered: List<DiscoveredTv> = emptyList(),
 )
 
+/** A sequence being played: [step] keys of [total] sent so far (0 while connecting). */
+data class SequenceRun(val id: String, val step: Int, val total: Int)
+
 class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
     private val client = SamsungTvClient(REMOTE_NAME) { token ->
@@ -65,6 +72,10 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     )
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     private val _playing = MutableStateFlow(true)
+    private val _sequences = MutableStateFlow(prefs.sequences)
+    private val _sequenceRun = MutableStateFlow<SequenceRun?>(null)
+    private var sequenceJob: Job? = null
+    private var sequenceGeneration = 0
 
     val connection: StateFlow<ConnectionState> = client.state
     val setup: StateFlow<SetupUi> = _setup.asStateFlow()
@@ -73,6 +84,9 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     /** Last play state sent; the TV does not report it, so the toggle assumes its own last press. */
     val playing: StateFlow<Boolean> = _playing.asStateFlow()
     val hasHost: Boolean get() = !prefs.host.isNullOrBlank()
+
+    val sequences: StateFlow<List<KeySequence>> = _sequences.asStateFlow()
+    val sequenceRun: StateFlow<SequenceRun?> = _sequenceRun.asStateFlow()
 
     init {
         client.configure(prefs.host, prefs.token)
@@ -85,7 +99,10 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun onStop() = client.disconnect()
+    fun onStop() {
+        stopSequence()
+        client.disconnect()
+    }
 
     fun key(code: String) {
         when (code) {
@@ -142,6 +159,94 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
             }
             say("TV did not wake up. Is \"Power On with Mobile\" enabled?")
         }
+    }
+
+    /** Adds [sequence], or replaces the saved one with the same id. */
+    fun saveSequence(sequence: KeySequence) {
+        val list = _sequences.value
+        val next = if (list.any { it.id == sequence.id }) {
+            list.map { if (it.id == sequence.id) sequence else it }
+        } else {
+            list + sequence
+        }
+        _sequences.value = next
+        prefs.sequences = next
+    }
+
+    fun deleteSequence(id: String) {
+        if (_sequenceRun.value?.id == id) {
+            stopSequence()
+        }
+        val next = _sequences.value.filterNot { it.id == id }
+        _sequences.value = next
+        prefs.sequences = next
+    }
+
+    fun moveSequence(id: String, offset: Int) {
+        val list = _sequences.value.toMutableList()
+        val from = list.indexOfFirst { it.id == id }
+        val to = from + offset
+        if (from < 0 || to !in list.indices) {
+            return
+        }
+        list.add(to, list.removeAt(from))
+        _sequences.value = list
+        prefs.sequences = list
+    }
+
+    /**
+     * Sends the keys of [sequence] one by one with its pause in between. Starting another
+     * sequence stops the one already playing. Waits for the connection first: keys sent while
+     * disconnected would be queued and then flushed all at once, without the pauses.
+     */
+    fun runSequence(sequence: KeySequence) {
+        if (sequence.keys.isEmpty()) {
+            return
+        }
+        if (!hasHost) {
+            return say("Set up the TV first")
+        }
+        sequenceJob?.cancel()
+        val generation = ++sequenceGeneration
+        sequenceJob = viewModelScope.launch {
+            try {
+                _sequenceRun.value = SequenceRun(sequence.id, 0, sequence.keys.size)
+                if (!awaitConnected()) {
+                    say("Not connected to the TV")
+                    return@launch
+                }
+                sequence.keys.forEachIndexed { index, code ->
+                    if (index > 0) {
+                        delay(sequence.delayMs)
+                    }
+                    _sequenceRun.value = SequenceRun(sequence.id, index + 1, sequence.keys.size)
+                    key(code)
+                }
+                delay(SEQUENCE_DONE_MS)
+            } finally {
+                if (generation == sequenceGeneration) {
+                    _sequenceRun.value = null
+                }
+            }
+        }
+    }
+
+    fun stopSequence() {
+        sequenceGeneration++
+        sequenceJob?.cancel()
+        sequenceJob = null
+        _sequenceRun.value = null
+    }
+
+    private suspend fun awaitConnected(): Boolean {
+        if (client.state.value == ConnectionState.Connected) {
+            return true
+        }
+        client.connect()
+        val state = withTimeoutOrNull(CONNECT_WAIT_MS) {
+            client.state.first { it == ConnectionState.Connected || it == ConnectionState.Denied }
+        }
+        return state == ConnectionState.Connected
     }
 
     fun selectHost(raw: String) {
@@ -254,5 +359,8 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
         const val REMOTE_NAME = "Android Remote"
         const val WAKE_POLLS = 10
         const val WAKE_POLL_MS = 1500L
+        const val CONNECT_WAIT_MS = 8_000L
+        /** Keeps the finished run visible for a moment so the last step shows in the list. */
+        const val SEQUENCE_DONE_MS = 300L
     }
 }

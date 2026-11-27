@@ -25,7 +25,12 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_VOLUME_KEYS, true)
         set(value) = prefs.edit().putBoolean(KEY_VOLUME_KEYS, value).apply()
 
+    var sequences: List<KeySequence>
+        get() = KeySequence.decode(prefs.getString(KEY_SEQUENCES, null))
+        set(value) = prefs.edit().putString(KEY_SEQUENCES, KeySequence.encode(value)).apply()
+
     private companion object {
+        const val KEY_SEQUENCES = "sequences"
         const val KEY_HOST = "host"
         const val KEY_TOKEN = "token"
         const val KEY_MAC = "mac"

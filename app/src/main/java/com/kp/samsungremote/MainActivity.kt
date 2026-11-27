@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Wifi
@@ -48,6 +49,7 @@ import com.kp.samsungremote.tv.TvKey
 import com.kp.samsungremote.ui.KeysScreen
 import com.kp.samsungremote.ui.RemoteScreen
 import com.kp.samsungremote.ui.RemoteViewModel
+import com.kp.samsungremote.ui.SequencesScreen
 import com.kp.samsungremote.ui.SetupScreen
 import com.kp.samsungremote.ui.describe
 import com.kp.samsungremote.ui.theme.RemoteColors
@@ -93,7 +95,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) { REMOTE("Remote"), KEYS("More keys"), SETUP("Setup") }
+private enum class Tab(val label: String) { SETUP("Setup"), KEYS("More keys"), SEQUENCES("Sequences"), REMOTE("Remote") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,6 +131,7 @@ private fun App(vm: RemoteViewModel) {
                                 when (item) {
                                     Tab.REMOTE -> Icons.Filled.SettingsRemote
                                     Tab.KEYS -> Icons.Filled.Dialpad
+                                    Tab.SEQUENCES -> Icons.AutoMirrored.Filled.PlaylistPlay
                                     Tab.SETUP -> Icons.Filled.Wifi
                                 },
                                 contentDescription = null,
@@ -144,6 +147,7 @@ private fun App(vm: RemoteViewModel) {
         when (Tab.entries[tab]) {
             Tab.REMOTE -> RemoteScreen(vm, content)
             Tab.KEYS -> KeysScreen(vm, content)
+            Tab.SEQUENCES -> SequencesScreen(vm, content)
             Tab.SETUP -> SetupScreen(vm, content)
         }
         if (connection == ConnectionState.WaitingForAllow) {
